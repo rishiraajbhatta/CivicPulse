@@ -338,7 +338,7 @@ export default function CitizenNotificationsPage() {
               </p>
 
               <Link
-                href="/citizen/dashboard"
+                href="/citizen/complaints/dashboard"
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
                 Back to Dashboard

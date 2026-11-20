@@ -207,7 +207,7 @@ export default function CitizenDashboardPage() {
             </p>
 
             <Link
-              href="/citizen/report"
+              href="/citizen/complaints/report"
               className="mt-7 inline-flex items-center gap-3 rounded-xl bg-[#B9E77C] px-6 py-3.5 text-sm font-bold text-[#103D2D] shadow-lg transition hover:-translate-y-1 hover:bg-[#D0F19E]"
             >
               <Plus size={19} />
@@ -450,7 +450,7 @@ export default function CitizenDashboardPage() {
               </p>
 
               <Link
-                href="/citizen/report"
+                href="/citizen/complaints/report"
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#103D2D] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#18563D]"
               >
                 <Plus size={16} />

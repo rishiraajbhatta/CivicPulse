@@ -34,7 +34,7 @@ interface CitizenLayoutProps {
 const navigation = [
   {
     label: "Overview",
-    href: "/citizen/dashboard",
+    href: "/citizen/complaints/dashboard",
     icon: LayoutDashboard,
   },
   {
@@ -44,7 +44,7 @@ const navigation = [
   },
   {
     label: "Report an Issue",
-    href: "/citizen/report",
+    href: "/citizen/complaints/report",
     icon: PlusCircle,
   },
   {
@@ -106,7 +106,7 @@ export default function CitizenLayout({
     <div className="min-h-screen bg-[#F5F7F0] text-[#173D2D]">
       {/* MOBILE HEADER */}
       <header className="sticky top-0 z-40 flex h-[76px] items-center justify-between border-b border-[#E5EBDD] bg-white/95 px-5 backdrop-blur-xl lg:hidden">
-        <Link href="/citizen/dashboard" className="flex items-center gap-2.5">
+        <Link href="/citizen/complaints/dashboard" className="flex items-center gap-2.5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#103D2D] text-[#B9E77C]">
             <Leaf size={22} />
           </div>
@@ -135,7 +135,7 @@ export default function CitizenLayout({
           {/* BRAND */}
           <div className="flex h-[88px] items-center border-b border-[#EEF1E9] px-7">
             <Link
-              href="/citizen/dashboard"
+              href="/citizen/complaints/dashboard"
               className="flex items-center gap-3"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#103D2D] text-[#B9E77C]">
@@ -226,7 +226,7 @@ export default function CitizenLayout({
               </p>
 
               <Link
-                href="/citizen/report"
+                href="/citizen/complaints/report"
                 onClick={() => setMobileMenuOpen(false)}
                 className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-[#B9E77C] py-2.5 text-xs font-bold text-[#103D2D] transition hover:bg-[#D0F19E]"
               >

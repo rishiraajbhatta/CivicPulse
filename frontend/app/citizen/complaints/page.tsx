@@ -451,7 +451,7 @@ export default function CitizenComplaintsPage() {
         </div>
 
         <Link
-          href="/citizen/report"
+          href="/citizen/complaints/report"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#174D35] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#174D35]/10 transition hover:-translate-y-1 hover:bg-[#103D2D]"
         >
           <Plus size={18} />
@@ -623,7 +623,7 @@ export default function CitizenComplaintsPage() {
 
             {complaints.length === 0 && (
               <Link
-                href="/citizen/report"
+                href="/citizen/complaints/report"
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#174D35] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#103D2D]"
               >
                 <Plus size={17} />

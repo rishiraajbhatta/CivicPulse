@@ -167,7 +167,7 @@ export default function AuthPage() {
         })
       );
 
-      window.location.href = "/citizen/dashboard";
+      window.location.href = "/citizen/complaints/dashboard";
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

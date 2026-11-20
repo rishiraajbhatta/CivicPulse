@@ -6,6 +6,7 @@ import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  setWorkerUrl,
   type MapMouseEvent,
 } from "maplibre-gl";
 
@@ -122,6 +123,8 @@ export default function ReportIssuePage() {
     if (!mapVisible || !mapContainerRef.current || mapRef.current) {
       return;
     }
+
+    setWorkerUrl("/maplibre-gl-csp-worker.js");
 
     const initialLatitude = latitudeRef.current ?? 12.9716;
     const initialLongitude = longitudeRef.current ?? 77.5946;
@@ -428,7 +431,7 @@ export default function ReportIssuePage() {
               </Link>
 
               <Link
-                href="/citizen/dashboard"
+                href="/citizen/complaints/dashboard"
                 className="flex flex-1 items-center justify-center rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
               >
                 Back to Dashboard
@@ -754,7 +757,7 @@ export default function ReportIssuePage() {
           {/* Submit */}
           <div className="flex flex-col-reverse items-stretch justify-between gap-4 sm:flex-row sm:items-center">
             <Link
-              href="/citizen/dashboard"
+              href="/citizen/complaints/dashboard"
               className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-600 transition hover:bg-gray-50"
             >
               <ArrowLeft size={17} />

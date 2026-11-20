@@ -5,12 +5,9 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
-// Automatically attach JWT token to authenticated requests.
+// Automatically attach JWT token and handle FormData headers properly.
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
@@ -19,6 +16,12 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+    }
+
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    } else if (!config.headers["Content-Type"]) {
+      config.headers["Content-Type"] = "application/json";
     }
 
     return config;
@@ -34,8 +37,7 @@ api.interceptors.response.use(
       const status = error.response?.status;
       const currentPath = window.location.pathname;
 
-      const isAuthenticationPage =
-        currentPath === "/auth";
+      const isAuthenticationPage = currentPath === "/auth";
 
       const isLoginOrRegistrationRequest =
         error.config?.url?.includes("/api/citizens/login") ||
