@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f8f1;
+  --foreground: #173d2d;
+  --forest: #103d2d;
+  --emerald: #16734b;
+  --lime: #b9e77c;
+  --mint: #dcebdc;
+  --ivory: #f7f8f1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 30px;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+}
+
+::selection {
+  background: #b9e77c;
+  color: #103d2d;
+}
+
+/* HERO BACKGROUND GRID */
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 55px 55px;
+  mask-image: linear-gradient(to bottom, black, transparent 95%);
+}
+
+/* AMBIENT LIGHTING */
+
+.hero-glow {
+  pointer-events: none;
+  will-change: transform;
+  filter: blur(110px);
+  animation: ambientFloat 14s ease-in-out infinite alternate;
+}
+
+@keyframes ambientFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(35px, -25px, 0) scale(1.08);
+  }
+
+  100% {
+    transform: translate3d(-20px, 30px, 0) scale(0.96);
+  }
+}
+
+/* HERO LIGHT SPOT */
+
+.hero-light {
+  background:
+    radial-gradient(
+      ellipse at 20% 35%,
+      rgba(92, 184, 117, 0.17),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 85% 20%,
+      rgba(185, 231, 124, 0.12),
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 65% 90%,
+      rgba(34, 130, 87, 0.24),
+      transparent 45%
+    );
+}
+
+/* DECORATIVE RINGS */
+
+.background-ring {
+  position: absolute;
+  border: 1px solid rgba(220, 255, 224, 0.09);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* PREMIUM SECTION GLOW */
+
+.section-glow {
+  background:
+    radial-gradient(
+      circle at 10% 20%,
+      rgba(185, 231, 124, 0.16),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      rgba(57, 155, 112, 0.12),
+      transparent 35%
+    );
+}
+
+/* SCROLLBAR */
+
+::-webkit-scrollbar {
+  width: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f4ec;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8eae91;
+  border-radius: 20px;
+  border: 2px solid #f1f4ec;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #43845d;
+}
+
+/* ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-grid {
+    background-size: 38px 38px;
+  }
+}
