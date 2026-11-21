@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -23,6 +23,7 @@ import {
   Loader2,
   MapPin,
   Navigation,
+  Search,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -73,7 +74,7 @@ const categories = [
     value: "OTHER",
     label: "Other",
     description: "Any other civic issue",
-    icon: "📍",
+    icon: "📋",
   },
 ];
 
@@ -86,6 +87,13 @@ interface ComplaintResponse {
   status: string;
 }
 
+interface SearchResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 export default function ReportIssuePage() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
@@ -94,10 +102,14 @@ export default function ReportIssuePage() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
 
-  const [mapVisible, setMapVisible] = useState(false);
+  const [mapVisible, setMapVisible] = useState(true);
 
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -118,13 +130,90 @@ export default function ReportIssuePage() {
     longitudeRef.current = longitude;
   }, [latitude, longitude]);
 
+  // Reverse-geocode coordinates into a readable street/area address.
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data?.display_name) {
+        setAddress(String(data.display_name).slice(0, 255));
+      }
+    } catch {
+      // Allow manual address entry if reverse geocoding is unreachable.
+    }
+  };
+
+  // Search address or landmark via OpenStreetMap Nominatim.
+  const handleAddressSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setSearchingAddress(true);
+    setError("");
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
+          query
+        )}&limit=5`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Search failed");
+      }
+
+      const results: SearchResult[] = await res.json();
+      setSearchResults(results);
+
+      if (results.length === 0) {
+        setError(
+          "No matching locations found. Try adding your city or click directly on the map."
+        );
+      } else if (results.length === 1) {
+        selectSearchResult(results[0]);
+      }
+    } catch {
+      setError(
+        "Unable to search address right now. You can still click directly on the map and type your address below."
+      );
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  const selectSearchResult = (item: SearchResult) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+
+    setMapVisible(true);
+    updateMapLocation(lat, lng);
+    setAddress(item.display_name.slice(0, 255));
+    setSearchQuery(item.display_name);
+    setSearchResults([]);
+  };
+
   // Initialize map.
   useEffect(() => {
     if (!mapVisible || !mapContainerRef.current || mapRef.current) {
       return;
     }
 
-    setWorkerUrl("/maplibre-gl-csp-worker.js");
+    setWorkerUrl("/maplibre-gl-worker.mjs");
 
     const initialLatitude = latitudeRef.current ?? 12.9716;
     const initialLongitude = longitudeRef.current ?? 77.5946;
@@ -133,7 +222,7 @@ export default function ReportIssuePage() {
       container: mapContainerRef.current,
       style: "https://tiles.openfreemap.org/styles/liberty",
       center: [initialLongitude, initialLatitude],
-      zoom: 12,
+      zoom: latitudeRef.current !== null ? 16 : 12,
     });
 
     mapRef.current = map;
@@ -154,6 +243,7 @@ export default function ReportIssuePage() {
 
       setLatitude(coordinates.lat);
       setLongitude(coordinates.lng);
+      reverseGeocode(coordinates.lat, coordinates.lng);
     });
 
     map.on("click", (event: MapMouseEvent) => {
@@ -163,6 +253,7 @@ export default function ReportIssuePage() {
 
       setLatitude(lat);
       setLongitude(lng);
+      reverseGeocode(lat, lng);
     });
 
     return () => {
@@ -205,9 +296,9 @@ export default function ReportIssuePage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        updateMapLocation(lat, lng);
-
         setMapVisible(true);
+        updateMapLocation(lat, lng);
+        reverseGeocode(lat, lng);
         setLoadingLocation(false);
       },
       (locationError) => {
@@ -215,11 +306,11 @@ export default function ReportIssuePage() {
 
         if (locationError.code === locationError.PERMISSION_DENIED) {
           setError(
-            "Location permission was denied. Please allow location access or select a location manually on the map."
+            "Location permission was denied. Search your address or click directly on the map below."
           );
         } else {
           setError(
-            "Unable to retrieve your location. Please select it manually on the map."
+            "Unable to retrieve GPS location. Search your address or click on the map below."
           );
         }
       },
@@ -302,7 +393,9 @@ export default function ReportIssuePage() {
     }
 
     if (latitude === null || longitude === null) {
-      setError("Please select the issue location on the map.");
+      setError(
+        "Please pin the issue location on the map (search an address, use GPS, or click on the map)."
+      );
       return;
     }
 
@@ -348,18 +441,20 @@ export default function ReportIssuePage() {
 
       setSuccess(complaint);
     } catch (err: unknown) {
-      const errorMessage = (
+      const responseData = (
         err as {
           response?: {
             data?: {
+              error?: string;
               message?: string;
             };
           };
         }
-      ).response?.data?.message;
+      ).response?.data;
 
       setError(
-        errorMessage ||
+        responseData?.error ||
+          responseData?.message ||
           "Something went wrong while submitting your complaint. Please try again."
       );
     } finally {
@@ -582,47 +677,104 @@ export default function ReportIssuePage() {
                 </h3>
 
                 <p className="text-sm text-gray-500">
-                  Use GPS or select the exact location on the map.
+                  Search a street or landmark, use GPS, or click directly on the map.
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={getCurrentLocation}
-              disabled={loadingLocation}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 sm:w-auto"
-            >
-              {loadingLocation ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Crosshair size={18} />
+            {/* Address Search Box */}
+            <div className="mb-4">
+              <label
+                htmlFor="location-search"
+                className="mb-2 block text-sm font-semibold text-gray-700"
+              >
+                Search Location on Map
+              </label>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search
+                    size={17}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    id="location-search"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddressSearch();
+                      }
+                    }}
+                    placeholder="Search street, area, or landmark (e.g., MG Road, Bengaluru)"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddressSearch}
+                  disabled={searchingAddress || !searchQuery.trim()}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {searchingAddress ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Search size={16} />
+                  )}
+                  Find on Map
+                </button>
+              </div>
+
+              {searchResults.length > 0 && (
+                <div className="mt-2 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+                  {searchResults.map((item) => (
+                    <button
+                      key={item.place_id}
+                      type="button"
+                      onClick={() => selectSearchResult(item)}
+                      className="flex w-full items-start gap-2.5 px-4 py-3 text-left text-xs text-gray-700 transition hover:bg-emerald-50"
+                    >
+                      <MapPin
+                        size={15}
+                        className="mt-0.5 shrink-0 text-emerald-600"
+                      />
+                      <span>{item.display_name}</span>
+                    </button>
+                  ))}
+                </div>
               )}
-
-              {loadingLocation
-                ? "Getting your location..."
-                : "Use My Current Location"}
-            </button>
-
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gray-200" />
-
-              <span className="text-xs font-medium text-gray-400">
-                OR SELECT MANUALLY
-              </span>
-
-              <div className="h-px flex-1 bg-gray-200" />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setMapVisible(!mapVisible)}
-              className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-            >
-              <Navigation size={17} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={getCurrentLocation}
+                disabled={loadingLocation}
+                className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+              >
+                {loadingLocation ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : (
+                  <Crosshair size={17} />
+                )}
 
-              {mapVisible ? "Hide Map" : "Open Map to Select Location"}
-            </button>
+                {loadingLocation
+                  ? "Getting your location..."
+                  : "Use My Current Location"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMapVisible(!mapVisible)}
+                className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                <Navigation size={16} />
+                {mapVisible ? "Hide Map" : "Show Map"}
+              </button>
+            </div>
 
             {mapVisible && (
               <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
@@ -633,7 +785,7 @@ export default function ReportIssuePage() {
 
                 <div className="bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
                   Click anywhere on the map or drag the green marker
-                  to select the exact issue location.
+                  to pin the exact issue location.
                 </div>
               </div>
             )}
@@ -642,16 +794,8 @@ export default function ReportIssuePage() {
               <div className="mt-4 rounded-xl bg-emerald-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
                   <CheckCircle2 size={17} />
-                  Location selected
+                  Map pin set ({latitude.toFixed(5)}, {longitude.toFixed(5)})
                 </div>
-
-                <p className="mt-2 text-xs text-emerald-700">
-                  Latitude: {latitude.toFixed(6)}
-                </p>
-
-                <p className="mt-1 text-xs text-emerald-700">
-                  Longitude: {longitude.toFixed(6)}
-                </p>
               </div>
             )}
 
@@ -668,7 +812,7 @@ export default function ReportIssuePage() {
                 type="text"
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
-                placeholder="Example: Near Main Road, Rajajinagar, Bengaluru"
+                placeholder="Auto-filled from map pin, or type nearby landmark..."
                 maxLength={255}
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
               />
@@ -792,3 +936,4 @@ export default function ReportIssuePage() {
     </CitizenLayout>
   );
 }
+
