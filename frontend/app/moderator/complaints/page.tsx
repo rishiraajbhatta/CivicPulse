@@ -31,6 +31,7 @@ interface Complaint {
   longitude: number;
   address: string;
   status: string;
+  upvoteCount?: number;
   departmentName?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -514,6 +515,12 @@ export default function ModeratorComplaintsPage() {
                           <span className="text-sm font-extrabold text-gray-900">
                             {complaint.complaintCode}
                           </span>
+
+                          {(complaint.upvoteCount ?? 1) > 1 && (
+                            <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                              {complaint.upvoteCount} Citizens Affected
+                            </span>
+                          )}
 
                           <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-600">
                             {formatCategory(complaint.category)}

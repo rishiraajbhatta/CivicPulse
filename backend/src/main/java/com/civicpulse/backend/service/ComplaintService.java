@@ -1,13 +1,17 @@
 package com.civicpulse.backend.service;
 
 import com.civicpulse.backend.dto.ComplaintCreateRequest;
+import com.civicpulse.backend.dto.UpvoteResponse;
 import com.civicpulse.backend.dto.ComplaintResponse;
 
 import com.civicpulse.backend.entity.Citizen;
 import com.civicpulse.backend.entity.Complaint;
+import com.civicpulse.backend.entity.ComplaintStatus;
+import com.civicpulse.backend.entity.ComplaintUpvote;
 import com.civicpulse.backend.entity.Moderator;
 
 import com.civicpulse.backend.repository.ComplaintRepository;
+import com.civicpulse.backend.repository.ComplaintUpvoteRepository;
 import com.civicpulse.backend.repository.ModeratorRepository;
 
 import org.springframework.stereotype.Service;
@@ -18,11 +22,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.security.SecureRandom;
 import java.time.Year;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class ComplaintService {
 
     private final ComplaintRepository complaintRepository;
+    private final ComplaintUpvoteRepository complaintUpvoteRepository;
     private final ModeratorRepository moderatorRepository;
     private final ResendEmailService resendEmailService;
     private final DuplicateDetectionService duplicateDetectionService;
@@ -32,12 +38,14 @@ public class ComplaintService {
 
     public ComplaintService(
             ComplaintRepository complaintRepository,
+            ComplaintUpvoteRepository complaintUpvoteRepository,
             ModeratorRepository moderatorRepository,
             ResendEmailService resendEmailService,
             DuplicateDetectionService duplicateDetectionService,
             NotificationService notificationService
     ) {
         this.complaintRepository = complaintRepository;
+        this.complaintUpvoteRepository = complaintUpvoteRepository;
         this.moderatorRepository = moderatorRepository;
         this.resendEmailService = resendEmailService;
         this.duplicateDetectionService = duplicateDetectionService;
@@ -305,7 +313,69 @@ public class ComplaintService {
                 : null,
             complaint.getCreatedAt(),
             complaint.getUpdatedAt(),
-            complaint.getResolvedAt()
+            complaint.getResolvedAt(),
+            complaint.getUpvoteCount()
         );
+    }
+
+    // UPVOTE / SUPPORT AN EXISTING COMPLAINT
+    @Transactional
+    public UpvoteResponse upvoteComplaint(UUID complaintId, Citizen citizen) {
+        Complaint complaint = complaintRepository.findById(complaintId)
+            .orElseThrow(() -> new IllegalArgumentException("Complaint not found."));
+
+        if (complaint.getCitizen().getId().equals(citizen.getId())) {
+            throw new IllegalArgumentException("You already reported this issue.");
+        }
+
+        if (complaint.getStatus() == ComplaintStatus.RESOLVED ||
+                complaint.getStatus() == ComplaintStatus.REJECTED ||
+                complaint.getStatus() == ComplaintStatus.DUPLICATE) {
+            throw new IllegalArgumentException("This complaint is no longer open for upvotes.");
+        }
+
+        if (complaintUpvoteRepository.existsByComplaint_IdAndCitizen_Id(complaintId, citizen.getId())) {
+            throw new IllegalArgumentException("You have already upvoted this complaint.");
+        }
+
+        ComplaintUpvote upvote = new ComplaintUpvote();
+        upvote.setComplaint(complaint);
+        upvote.setCitizen(citizen);
+        complaintUpvoteRepository.save(upvote);
+
+        int updatedCount = Math.max(complaint.getUpvoteCount(), 1) + 1;
+        complaint.setUpvoteCount(updatedCount);
+        complaintRepository.save(complaint);
+
+        // Notify active moderators about increased citizen impact
+        List<Moderator> activeModerators = moderatorRepository.findByActiveTrue();
+        for (Moderator moderator : activeModerators) {
+            notificationService.createModeratorNotification(
+                moderator,
+                complaint,
+                "Additional citizen affected (" + updatedCount + " total)",
+                "Another citizen confirmed the same " + complaint.getCategory()
+                    + " issue on " + complaint.getComplaintCode()
+                    + ". Total citizens affected: " + updatedCount + ".",
+                "COMPLAINT_UPVOTED"
+            );
+        }
+
+        return new UpvoteResponse(
+            complaint.getId(),
+            complaint.getComplaintCode(),
+            updatedCount,
+            "Your support has been added to " + complaint.getComplaintCode() + "."
+        );
+    }
+
+    // GET COMPLAINTS UPVOTED BY CITIZEN
+    @Transactional(readOnly = true)
+    public List<ComplaintResponse> getUpvotedComplaints(Citizen citizen) {
+        return complaintUpvoteRepository
+            .findByCitizen_IdOrderByCreatedAtDesc(citizen.getId())
+            .stream()
+            .map(upvote -> convertToResponse(upvote.getComplaint()))
+            .toList();
     }
 }

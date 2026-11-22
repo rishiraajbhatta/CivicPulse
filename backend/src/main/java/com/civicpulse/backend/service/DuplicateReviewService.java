@@ -332,7 +332,8 @@ public class DuplicateReviewService {
                 : null,
             complaint.getCreatedAt(),
             complaint.getUpdatedAt(),
-            complaint.getResolvedAt()
+            complaint.getResolvedAt(),
+            complaint.getUpvoteCount()
         );
     }
 }

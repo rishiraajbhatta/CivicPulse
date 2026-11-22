@@ -21,6 +21,7 @@ public class ComplaintResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime resolvedAt;
+    private int upvoteCount = 1;
 
     public ComplaintResponse() {
     }
@@ -53,6 +54,26 @@ public class ComplaintResponse {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.resolvedAt = resolvedAt;
+    }
+
+    public ComplaintResponse(
+            UUID id,
+            String complaintCode,
+            String citizenName,
+            ComplaintCategory category,
+            String description,
+            Double latitude,
+            Double longitude,
+            String address,
+            ComplaintStatus status,
+            String departmentName,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            LocalDateTime resolvedAt,
+            int upvoteCount
+    ) {
+        this(id, complaintCode, citizenName, category, description, latitude, longitude, address, status, departmentName, createdAt, updatedAt, resolvedAt);
+        this.upvoteCount = Math.max(upvoteCount, 1);
     }
 
     public UUID getId() {
@@ -105,5 +126,9 @@ public class ComplaintResponse {
 
     public LocalDateTime getResolvedAt() {
         return resolvedAt;
+    }
+
+    public int getUpvoteCount() {
+        return Math.max(upvoteCount, 1);
     }
 }

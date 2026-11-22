@@ -3,13 +3,16 @@ package com.civicpulse.backend.service;
 import com.civicpulse.backend.dto.ComplaintResponse;
 import com.civicpulse.backend.dto.ComplaintStatusUpdateRequest;
 
+import com.civicpulse.backend.entity.Citizen;
 import com.civicpulse.backend.entity.Complaint;
+import com.civicpulse.backend.entity.ComplaintUpvote;
 import com.civicpulse.backend.entity.ComplaintImage;
 import com.civicpulse.backend.entity.ComplaintStatus;
 import com.civicpulse.backend.entity.Department;
 import com.civicpulse.backend.entity.Moderator;
 
 import com.civicpulse.backend.repository.ComplaintRepository;
+import com.civicpulse.backend.repository.ComplaintUpvoteRepository;
 import com.civicpulse.backend.repository.ComplaintImageRepository;
 import com.civicpulse.backend.repository.DepartmentRepository;
 
@@ -20,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +31,7 @@ import java.util.UUID;
 public class ModeratorComplaintService {
 
     private final ComplaintRepository complaintRepository;
+    private final ComplaintUpvoteRepository complaintUpvoteRepository;
     private final ComplaintImageRepository complaintImageRepository;
     private final DepartmentRepository departmentRepository;
     private final ComplaintUpdateService complaintUpdateService;
@@ -35,6 +40,7 @@ public class ModeratorComplaintService {
 
     public ModeratorComplaintService(
             ComplaintRepository complaintRepository,
+            ComplaintUpvoteRepository complaintUpvoteRepository,
             ComplaintImageRepository complaintImageRepository,
             DepartmentRepository departmentRepository,
             ComplaintUpdateService complaintUpdateService,
@@ -42,6 +48,7 @@ public class ModeratorComplaintService {
             ResendEmailService resendEmailService
     ) {
         this.complaintRepository = complaintRepository;
+        this.complaintUpvoteRepository = complaintUpvoteRepository;
         this.complaintImageRepository = complaintImageRepository;
         this.departmentRepository = departmentRepository;
         this.complaintUpdateService = complaintUpdateService;
@@ -481,7 +488,8 @@ public class ModeratorComplaintService {
                 : null,
             complaint.getCreatedAt(),
             complaint.getUpdatedAt(),
-            complaint.getResolvedAt()
+            complaint.getResolvedAt(),
+            complaint.getUpvoteCount()
         );
     }
 }

@@ -1,6 +1,8 @@
 package com.civicpulse.backend.service;
 
+import com.civicpulse.backend.dto.DuplicateMatchPreview;
 import com.civicpulse.backend.entity.Complaint;
+import com.civicpulse.backend.entity.ComplaintCategory;
 import com.civicpulse.backend.entity.ComplaintDuplicate;
 import com.civicpulse.backend.entity.ComplaintStatus;
 import com.civicpulse.backend.repository.ComplaintDuplicateRepository;
@@ -9,7 +11,10 @@ import com.civicpulse.backend.repository.ComplaintRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.Locale;
 import java.util.Set;
 import java.util.Arrays;
@@ -229,5 +234,67 @@ public class DuplicateDetectionService {
             .filter(word -> word.length() > 2)
             .filter(word -> !STOP_WORDS.contains(word))
             .collect(Collectors.toSet());
+    }
+
+    // PRE-SUBMISSION DUPLICATE CHECK FOR CITIZENS
+    @Transactional(readOnly = true)
+    public List<DuplicateMatchPreview> findNearbyMatches(
+            ComplaintCategory category,
+            double latitude,
+            double longitude,
+            String description
+    ) {
+        double latitudeDifference = SEARCH_RADIUS_METERS / 111320.0;
+        double longitudeDifference = SEARCH_RADIUS_METERS /
+            (111320.0 * Math.max(Math.abs(Math.cos(Math.toRadians(latitude))), 0.01));
+
+        List<Complaint> nearbyComplaints = complaintRepository.findPotentialDuplicates(
+            UUID.fromString("00000000-0000-0000-0000-000000000000"),
+            category,
+            latitude - latitudeDifference,
+            latitude + latitudeDifference,
+            longitude - longitudeDifference,
+            longitude + longitudeDifference,
+            ACTIVE_STATUSES
+        );
+
+        boolean hasDescription = description != null && !description.isBlank();
+        List<DuplicateMatchPreview> matches = new ArrayList<>();
+
+        for (Complaint existing : nearbyComplaints) {
+            double distance = calculateDistance(
+                latitude,
+                longitude,
+                existing.getLatitude(),
+                existing.getLongitude()
+            );
+
+            if (distance > SEARCH_RADIUS_METERS) {
+                continue;
+            }
+
+            double similarity = hasDescription
+                ? calculateSimilarity(description, existing.getDescription())
+                : 0.0;
+
+            // Warn if within 50m (location match) OR within 150m with >= 20% text match
+            if (distance <= 50.0 || (hasDescription && similarity >= MIN_DESCRIPTION_SIMILARITY)) {
+                matches.add(new DuplicateMatchPreview(
+                    existing.getId(),
+                    existing.getComplaintCode(),
+                    existing.getCategory(),
+                    existing.getDescription(),
+                    existing.getAddress(),
+                    existing.getStatus(),
+                    Math.max(existing.getUpvoteCount(), 1),
+                    Math.round(distance * 10.0) / 10.0,
+                    Math.round(similarity * 100.0) / 100.0,
+                    existing.getCreatedAt()
+                ));
+            }
+        }
+
+        matches.sort(Comparator.comparingDouble(DuplicateMatchPreview::distanceMeters));
+        return matches;
     }
 }

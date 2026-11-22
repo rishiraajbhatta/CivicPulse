@@ -16,6 +16,7 @@ import {
   X,
   ChevronRight,
   MapPin,
+  ThumbsUp,
 } from "lucide-react";
 
 interface CitizenUser {
@@ -41,6 +42,11 @@ const navigation = [
     label: "My Complaints",
     href: "/citizen/complaints",
     icon: FileText,
+  },
+  {
+    label: "Supported Issues",
+    href: "/citizen/complaints/upvoted",
+    icon: ThumbsUp,
   },
   {
     label: "Report an Issue",

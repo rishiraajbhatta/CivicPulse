@@ -58,6 +58,9 @@ public class Complaint {
     @Column(nullable = false)
     private boolean duplicateFlagged = false;
 
+    @Column(nullable = false, columnDefinition = "integer default 1")
+    private int upvoteCount = 1;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -177,6 +180,14 @@ public class Complaint {
 
     public void setPrimaryComplaint(Complaint primaryComplaint) {
         this.primaryComplaint = primaryComplaint;
+    }
+
+    public int getUpvoteCount() {
+        return upvoteCount;
+    }
+
+    public void setUpvoteCount(int upvoteCount) {
+        this.upvoteCount = upvoteCount;
     }
 
     public boolean isDuplicateFlagged() {

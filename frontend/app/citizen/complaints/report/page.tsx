@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -14,6 +14,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -24,8 +25,10 @@ import {
   MapPin,
   Navigation,
   Search,
+  ThumbsUp,
   Trash2,
   Upload,
+  Users,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -87,6 +90,18 @@ interface ComplaintResponse {
   status: string;
 }
 
+interface DuplicateMatchPreview {
+  id: string;
+  complaintCode: string;
+  category: string;
+  description: string;
+  address: string;
+  status: string;
+  distanceMeters: number;
+  similarityScore: number;
+  createdAt: string;
+}
+
 interface SearchResult {
   place_id: number;
   display_name: string;
@@ -117,6 +132,10 @@ export default function ReportIssuePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<ComplaintResponse | null>(null);
   const [uploadWarning, setUploadWarning] = useState("");
+  const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatchPreview[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [upvotingId, setUpvotingId] = useState<string | null>(null);
+  const [upvotedSuccess, setUpvotedSuccess] = useState<{ complaintCode: string; upvoteCount: number } | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -129,6 +148,48 @@ export default function ReportIssuePage() {
     latitudeRef.current = latitude;
     longitudeRef.current = longitude;
   }, [latitude, longitude]);
+
+  // Live pre-submission duplicate check whenever category, coordinates, or description change
+  useEffect(() => {
+    if (!category || latitude === null || longitude === null) {
+      setDuplicateMatches([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCheckingDuplicates(true);
+      try {
+        const res = await api.get<DuplicateMatchPreview[]>(
+          "/api/complaints/check-duplicate",
+          {
+            params: {
+              category,
+              latitude,
+              longitude,
+              description: description.trim() || undefined,
+            },
+          }
+        );
+        if (!cancelled) {
+          setDuplicateMatches(res.data || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setDuplicateMatches([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingDuplicates(false);
+        }
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [category, latitude, longitude, description]);
 
   // Reverse-geocode coordinates into a readable street/area address.
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -368,6 +429,43 @@ export default function ReportIssuePage() {
     setPhotoPreview("");
   };
 
+  const handleUpvoteMatch = async (matchId: string) => {
+    setError("");
+    setUpvotingId(matchId);
+    try {
+      const res = await api.post<{
+        complaintId: string;
+        complaintCode: string;
+        upvoteCount: number;
+        message: string;
+      }>(`/api/complaints/${matchId}/upvote`);
+
+      setUpvotedSuccess({
+        complaintCode: res.data.complaintCode,
+        upvoteCount: res.data.upvoteCount,
+      });
+    } catch (err: unknown) {
+      const responseData = (
+        err as {
+          response?: {
+            data?: {
+              error?: string;
+              message?: string;
+            };
+          };
+        }
+      ).response?.data;
+
+      setError(
+        responseData?.error ||
+          responseData?.message ||
+          "Unable to upvote this complaint right now."
+      );
+    } finally {
+      setUpvotingId(null);
+    }
+  };
+
   // Submit complaint.
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -471,6 +569,69 @@ export default function ReportIssuePage() {
     };
   }, [photoPreview]);
 
+  // Successful upvote screen.
+  if (upvotedSuccess) {
+    return (
+      <CitizenLayout
+        title="Report an Issue"
+        description="Your support has been recorded on the existing complaint."
+      >
+        <div className="mx-auto max-w-2xl py-10">
+          <div className="rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-xl shadow-emerald-900/5 sm:p-12">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <ThumbsUp size={38} className="text-emerald-600" />
+            </div>
+
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">
+              Support Added!
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-md text-gray-500">
+              Instead of creating a duplicate ticket, your vote has been added to the existing complaint so moderators can prioritize it.
+            </p>
+
+            <div className="mt-8 rounded-2xl bg-emerald-50 p-6">
+              <p className="text-sm font-medium text-emerald-700">
+                Linked Complaint Tracking ID
+              </p>
+
+              <p className="mt-2 text-2xl font-extrabold tracking-wide text-emerald-800">
+                {upvotedSuccess.complaintCode}
+              </p>
+
+              <p className="mt-3 text-sm font-semibold text-emerald-800">
+                {upvotedSuccess.upvoteCount} citizens affected by this issue
+              </p>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setUpvotedSuccess(null);
+                  setDescription("");
+                  setAddress(""); setPhoto(null); setPhotoPreview("");
+                  setError("");
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-semibold text-emerald-800 transition hover:bg-emerald-100"
+              >
+                Report Another Issue
+              </button>
+
+              <Link
+                href="/citizen/complaints/upvoted"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700"
+              >
+                View Supported Issues
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </CitizenLayout>
+    );
+  }
+
   // Successful submission screen.
   if (success) {
     return (
@@ -517,6 +678,20 @@ export default function ReportIssuePage() {
             )}
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccess(null);
+                  setUploadWarning("");
+                  setDescription("");
+                  setAddress(""); setPhoto(null); setPhotoPreview("");
+                  setError("");
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-semibold text-emerald-800 transition hover:bg-emerald-100"
+              >
+                Report Another Issue
+              </button>
+
               <Link
                 href="/citizen/complaints"
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700"
@@ -889,6 +1064,98 @@ export default function ReportIssuePage() {
               </div>
             )}
           </section>
+
+          {/* Potential Duplicate Alert */}
+          {checkingDuplicates && (
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-xs font-medium text-amber-800">
+              <Loader2 size={15} className="animate-spin" />
+              Checking if a similar complaint has already been registered nearby...
+            </div>
+          )}
+
+          {!checkingDuplicates && duplicateMatches.length > 0 && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800">
+                  <AlertTriangle size={21} />
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <h4 className="text-sm font-bold text-amber-950 sm:text-base">
+                    Similar complaint already registered nearby
+                  </h4>
+
+                  <p className="text-xs leading-5 text-amber-900 sm:text-sm">
+                    We found{" "}
+                    <span className="font-semibold">
+                      {duplicateMatches.length} active{" "}
+                      {duplicateMatches[0].category.replace(/_/g, " ").toLowerCase()}
+                    </span>{" "}
+                    report{duplicateMatches.length > 1 ? "s" : ""} within{" "}
+                    <span className="font-semibold">
+                      {duplicateMatches[0].distanceMeters} meters
+                    </span>{" "}
+                    of your pinned location:
+                  </p>
+
+                  <div className="space-y-2 pt-1">
+                    {duplicateMatches.slice(0, 2).map((match) => (
+                      <div
+                        key={match.id}
+                        className="rounded-xl border border-amber-200 bg-white/90 p-3 text-xs"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-bold text-emerald-800">
+                            {match.complaintCode}
+                          </span>
+                          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">
+                            {match.status.replace(/_/g, " ")} · {match.distanceMeters}m away
+                          </span>
+                        </div>
+
+                        <p className="mt-1.5 line-clamp-2 text-gray-700">
+                          {match.description}
+                        </p>
+
+                        {match.address && (
+                          <p className="mt-1 truncate text-[11px] text-gray-500">
+                            {match.address}
+                          </p>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-amber-100 pt-2.5">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-600">
+                            <Users size={13} className="text-emerald-700" />
+                            {match.upvoteCount} {match.upvoteCount === 1 ? "citizen" : "citizens"} affected
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleUpvoteMatch(match.id)}
+                            disabled={upvotingId === match.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            {upvotingId === match.id ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <ThumbsUp size={13} />
+                            )}
+                            I have this issue too (Upvote)
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="pt-1 text-xs text-amber-800">
+                    Instead of creating a duplicate ticket, click{" "}
+                    <span className="font-semibold">I have this issue too (Upvote)</span>{" "}
+                    so moderators see multiple citizens are affected. If this is a separate issue, you can still submit below.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
