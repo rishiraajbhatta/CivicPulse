@@ -1,6 +1,5 @@
 package com.civicpulse.backend.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,9 +10,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class ResendEmailService {
@@ -24,19 +20,16 @@ public class ResendEmailService {
     private static final String BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
     private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
     private final String brevoApiKey;
     private final String senderEmail;
 
     public ResendEmailService(
-            ObjectMapper objectMapper,
             @Value("${BREVO_API_KEY:}") String brevoApiKey,
             @Value("${BREVO_SENDER_EMAIL:${spring.mail.username:}}") String senderEmail
     ) {
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-        this.objectMapper = objectMapper;
         this.brevoApiKey = brevoApiKey;
         this.senderEmail = senderEmail;
     }
@@ -70,23 +63,17 @@ public class ResendEmailService {
                 ? htmlContent
                 : "<p>" + plainText + "</p>";
 
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("sender", Map.of(
-                "name", "CivicPulse",
-                "email", senderEmail.trim()
-            ));
-            payload.put("to", List.of(Map.of(
-                "email", recipient.trim()
-            )));
-            payload.put("replyTo", Map.of(
-                "name", "CivicPulse",
-                "email", senderEmail.trim()
-            ));
-            payload.put("subject", subject);
-            payload.put("htmlContent", html);
-            payload.put("textContent", plainText);
+            String cleanSender = senderEmail.trim();
+            String cleanRecipient = recipient.trim();
 
-            String jsonBody = objectMapper.writeValueAsString(payload);
+            String jsonBody = "{"
+                + "\"sender\":{\"name\":\"CivicPulse\",\"email\":" + jsonString(cleanSender) + "},"
+                + "\"to\":[{\"email\":" + jsonString(cleanRecipient) + "}],"
+                + "\"replyTo\":{\"name\":\"CivicPulse\",\"email\":" + jsonString(cleanSender) + "},"
+                + "\"subject\":" + jsonString(subject) + ","
+                + "\"htmlContent\":" + jsonString(html) + ","
+                + "\"textContent\":" + jsonString(plainText)
+                + "}";
 
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BREVO_ENDPOINT))
@@ -126,5 +113,34 @@ public class ResendEmailService {
             );
             return false;
         }
+    }
+
+    private static String jsonString(String value) {
+        if (value == null) {
+            return "null";
+        }
+        StringBuilder sb = new StringBuilder(value.length() + 16);
+        sb.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        sb.append('"');
+        return sb.toString();
     }
 }
