@@ -36,11 +36,12 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow local and deployed Next.js frontends.
-        List<String> allowedOrigins = new ArrayList<>(
+        // Allow local and all Vercel preview/production frontends.
+        List<String> allowedOriginPatterns = new ArrayList<>(
             List.of(
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "https://*.vercel.app"
             )
         );
         String envOrigins = System.getenv("ALLOWED_ORIGINS");
@@ -48,9 +49,9 @@ public class SecurityConfig {
             Arrays.stream(envOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
-                .forEach(allowedOrigins::add);
+                .forEach(allowedOriginPatterns::add);
         }
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOriginPatterns(allowedOriginPatterns);
 
         // Allow required HTTP methods.
         configuration.setAllowedMethods(
