@@ -99,6 +99,7 @@ interface DuplicateMatchPreview {
   status: string;
   distanceMeters: number;
   similarityScore: number;
+  upvoteCount?: number;
   createdAt: string;
 }
 
@@ -1126,7 +1127,7 @@ export default function ReportIssuePage() {
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-amber-100 pt-2.5">
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-600">
                             <Users size={13} className="text-emerald-700" />
-                            {match.upvoteCount} {match.upvoteCount === 1 ? "citizen" : "citizens"} affected
+                            {(match.upvoteCount ?? 1)} {(match.upvoteCount ?? 1) === 1 ? "citizen" : "citizens"} affected
                           </span>
 
                           <button
