@@ -13,6 +13,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -34,13 +36,21 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow the local Next.js frontend.
-        configuration.setAllowedOrigins(
+        // Allow local and deployed Next.js frontends.
+        List<String> allowedOrigins = new ArrayList<>(
             List.of(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000"
             )
         );
+        String envOrigins = System.getenv("ALLOWED_ORIGINS");
+        if (envOrigins != null && !envOrigins.isBlank()) {
+            Arrays.stream(envOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .forEach(allowedOrigins::add);
+        }
+        configuration.setAllowedOrigins(allowedOrigins);
 
         // Allow required HTTP methods.
         configuration.setAllowedMethods(
