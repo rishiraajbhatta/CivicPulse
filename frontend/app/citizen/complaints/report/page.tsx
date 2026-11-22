@@ -224,22 +224,60 @@ export default function ReportIssuePage() {
     setError("");
 
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
-          query
-        )}&limit=5`,
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+      let results: SearchResult[] = [];
+      const biasedQuery = /bengaluru|bangalore|karnataka|india/i.test(query)
+        ? query
+        : `${query}, Bengaluru, India`;
 
-      if (!res.ok) {
-        throw new Error("Search failed");
+      // Primary: Photon (OSM-based, CORS-friendly, fast for Indian localities)
+      try {
+        const photonRes = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(
+            biasedQuery
+          )}&lat=12.9716&lon=77.5946&limit=5`
+        );
+        if (photonRes.ok) {
+          const photonData = await photonRes.json();
+          const features = Array.isArray(photonData?.features) ? photonData.features : [];
+          results = features
+            .map((f: { properties?: Record<string, string | number>; geometry?: { coordinates?: number[] } }, idx: number) => {
+              const coords = f.geometry?.coordinates || [];
+              const p = f.properties || {};
+              const parts = [p.name, p.street, p.district || p.suburb, p.city || p.county, p.state, p.country]
+                .filter(Boolean);
+              return {
+                place_id: Number(p.osm_id || Date.now() + idx),
+                display_name: parts.join(", ") || query,
+                lat: String(coords[1] ?? ""),
+                lon: String(coords[0] ?? ""),
+              };
+            })
+            .filter((item: SearchResult) => item.lat && item.lon);
+        }
+      } catch {
+        // Fall through to Nominatim if Photon is unreachable
       }
 
-      const results: SearchResult[] = await res.json();
+      // Fallback: OpenStreetMap Nominatim biased to Bengaluru/India
+      if (results.length === 0) {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=in&viewbox=77.45,13.15,77.78,12.80&q=${encodeURIComponent(
+            biasedQuery
+          )}&limit=5`,
+          {
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error("Search failed");
+        }
+
+        results = await res.json();
+      }
+
       setSearchResults(results);
 
       if (results.length === 0) {
