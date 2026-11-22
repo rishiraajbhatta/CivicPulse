@@ -1,4 +1,4 @@
-﻿package com.civicpulse.backend.service;
+package com.civicpulse.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
