@@ -1,15 +1,18 @@
 package com.civicpulse.backend.service;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class ResendEmailService {
@@ -17,20 +20,15 @@ public class ResendEmailService {
     private static final Logger logger =
         LoggerFactory.getLogger(ResendEmailService.class);
 
-    private static final String RESEND_API_URL =
-        "https://api.resend.com/emails";
-
-    private final RestClient restClient;
-    private final String apiKey;
+    private final JavaMailSender mailSender;
     private final String fromEmail;
 
     public ResendEmailService(
-            @Value("${resend.api-key}") String apiKey,
-            @Value("${resend.from-email}") String fromEmail
+            JavaMailSender mailSender,
+            @Value("${spring.mail.username}") String fromEmail
     ) {
-        this.apiKey = apiKey;
+        this.mailSender = mailSender;
         this.fromEmail = fromEmail;
-        this.restClient = RestClient.create();
     }
 
     public boolean sendEmail(
@@ -45,35 +43,45 @@ public class ResendEmailService {
             return false;
         }
 
+        if (fromEmail == null || fromEmail.isBlank()) {
+            logger.warn("Email not sent: GMAIL_USERNAME is not configured.");
+            return false;
+        }
+
         try {
-            Map<String, Object> requestBody = new LinkedHashMap<>();
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(
+                message,
+                true,
+                StandardCharsets.UTF_8.name()
+            );
 
-            requestBody.put("from", fromEmail);
-            requestBody.put("to", recipient);
-            requestBody.put("subject", subject);
-            requestBody.put("html", htmlContent);
-            requestBody.put("text", textContent);
+            helper.setFrom(new InternetAddress(fromEmail, "CivicPulse"));
+            helper.setTo(recipient);
+            helper.setSubject(subject);
 
-            restClient.post()
-                .uri(RESEND_API_URL)
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Content-Type", "application/json")
-                .header("User-Agent", "CivicPulse-Backend/1.0")
-                .body(requestBody)
-                .retrieve()
-                .toBodilessEntity();
+            String plainText = (textContent != null && !textContent.isBlank())
+                ? textContent
+                : subject;
+            String html = (htmlContent != null && !htmlContent.isBlank())
+                ? htmlContent
+                : plainText;
+
+            helper.setText(plainText, html);
+
+            mailSender.send(message);
 
             logger.info(
-                "Email successfully sent to {}",
+                "Email successfully sent via Gmail SMTP to {}",
                 recipient
             );
 
             return true;
 
-        } catch (RestClientException exception) {
+        } catch (MailException | MessagingException | UnsupportedEncodingException exception) {
 
             logger.error(
-                "Failed to send email to {}: {}",
+                "Failed to send email via Gmail SMTP to {}: {}",
                 recipient,
                 exception.getMessage()
             );
